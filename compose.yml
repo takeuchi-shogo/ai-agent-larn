@@ -1,0 +1,57 @@
+services:
+  # Qdrant - ベクトル検索データベース
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ai-agent-qdrant
+    ports:
+      - "6333:6333"  # REST API
+      - "6334:6334"  # gRPC API
+    volumes:
+      - vector_db/qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT_ALLOW_ORIGIN=*
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Neo4j - グラフデータベース
+  neo4j:
+    image: neo4j:latest
+    container_name: ai-agent-neo4j
+    ports:
+      - "7474:7474"  # Webインターフェース
+      - "7687:7687"  # Bolt プロトコル
+    volumes:
+      - graph_db/neo4j_data:/data
+      - graph_db/neo4j_logs:/logs
+      - graph_db/neo4j_import:/import
+      - graph_db/neo4j_conf:/conf
+    environment:
+      - NEO4J_AUTH=neo4j/password  # ユーザー名/パスワード（本番環境では変更すること）
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_apoc_import_file_use__neo4j__config=true
+      - NEO4J_PLUGINS=["apoc"]  # APOCプラグインの有効化
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7474"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  vector_db/qdrant_data:
+    driver: local
+  graph_db/neo4j_data:
+    driver: local
+  graph_db/neo4j_logs:
+    driver: local
+  graph_db/neo4j_import:
+    driver: local
+  graph_db/neo4j_conf:
+    driver: local

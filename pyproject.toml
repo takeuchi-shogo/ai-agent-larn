@@ -1,0 +1,24 @@
+[project]
+name = "ai-agent-larn"
+version = "0.1.0"
+description = "AIエージェントと言語モデル学習リポジトリ"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain",
+    "langchain-core",
+    "langchain-openai",
+    "langchain-community",
+    "openai",
+    "langgraph>=0.0.38",
+    "python-dotenv>=1.1.0",
+    "qdrant-client",
+    "tiktoken",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+]
