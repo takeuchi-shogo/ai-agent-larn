@@ -31,12 +31,24 @@ class QdrantManager:
         host: str = "localhost",
         port: int = 6333,
     ) -> None:
-        """Qdrantマネージャーの初期化
+        """Qdrantベクトルデータベースマネージャーを初期化します。
+
+        このメソッドは、Qdrantクライアントの接続を確立し、embedding modelを初期化します。
+        デフォルトでは、ローカルホスト上のQdrantサーバーに接続し、さくらみこに関する
+        コレクションを使用するように設定されています。
 
         Args:
-            collection_name (str, optional): コレクション名. デフォルトは"sakura_miko_collection"
-            host (str, optional): ホスト名. デフォルトは"localhost"
-            port (int, optional): ポート番号. デフォルトは6333
+            collection_name (str, optional): 使用するQdrantコレクション名。
+                同じコレクション名を使用することで、既存のデータを再利用できます。
+                デフォルトは"sakura_miko_collection"。
+            host (str, optional): Qdrantサーバーのホスト名。
+                ローカル環境では"localhost"、Docker環境では"qdrant"など。
+                デフォルトは"localhost"。
+            port (int, optional): Qdrantサーバーのポート番号。
+                デフォルトは6333（Qdrantの標準ポート）。
+
+        Returns:
+            None
         """
         self.collection_name = collection_name
         self.client = QdrantClient(host=host, port=port)

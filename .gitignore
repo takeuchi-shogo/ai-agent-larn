@@ -4,3 +4,9 @@
 __pycache__
 .ruff_cache
 .mypy_cache
+
+vector_db/qdrant_data
+graph_db/neo4j_data
+graph_db/neo4j_logs
+graph_db/neo4j_import
+graph_db/neo4j_conf

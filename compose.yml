@@ -7,7 +7,7 @@ services:
       - "6333:6333"  # REST API
       - "6334:6334"  # gRPC API
     volumes:
-      - vector_db/qdrant_data:/qdrant/storage
+      - ./vector_db/qdrant_data:/qdrant/storage
     environment:
       - QDRANT_ALLOW_ORIGIN=*
     healthcheck:
@@ -26,10 +26,10 @@ services:
       - "7474:7474"  # Webインターフェース
       - "7687:7687"  # Bolt プロトコル
     volumes:
-      - graph_db/neo4j_data:/data
-      - graph_db/neo4j_logs:/logs
-      - graph_db/neo4j_import:/import
-      - graph_db/neo4j_conf:/conf
+      - ./graph_db/neo4j_data:/data
+      - ./graph_db/neo4j_logs:/logs
+      - ./graph_db/neo4j_import:/import
+      - ./graph_db/neo4j_conf:/conf
     environment:
       - NEO4J_AUTH=neo4j/password  # ユーザー名/パスワード（本番環境では変更すること）
       - NEO4J_apoc_export_file_enabled=true
@@ -45,13 +45,13 @@ services:
     restart: unless-stopped
 
 volumes:
-  vector_db/qdrant_data:
+  qdrant_data:
     driver: local
-  graph_db/neo4j_data:
+  neo4j_data:
     driver: local
-  graph_db/neo4j_logs:
+  neo4j_logs:
     driver: local
-  graph_db/neo4j_import:
+  neo4j_import:
     driver: local
-  graph_db/neo4j_conf:
+  neo4j_conf:
     driver: local

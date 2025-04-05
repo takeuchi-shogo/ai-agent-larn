@@ -14,6 +14,7 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "qdrant-client",
     "tiktoken",
+    "neo4j>=5.28.1",
 ]
 
 [project.optional-dependencies]
