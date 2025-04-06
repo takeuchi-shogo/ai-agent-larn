@@ -15,6 +15,7 @@ dependencies = [
     "qdrant-client",
     "tiktoken",
     "neo4j>=5.28.1",
+    "duckduckgo-search",
 ]
 
 [project.optional-dependencies]
