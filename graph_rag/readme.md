@@ -13,7 +13,45 @@ GraphRAGは以下の特徴を持ちます：
 
 ## アーキテクチャ
 
-![GraphRAGアーキテクチャ](https://mermaid.ink/img/pako:eNqFkk9LAzEQxb_KMicFtVBdL4KH9uBJULyJlGWabGuwSUgmQpf97k6y3T-Cggkhk_fem8xLTkIZh6IUkXFWo6MrVFrz5NCYcXewGg19a1IaA4HxYnrATMYHw8nQZZTxvDlJL2YDWRvXCiX78i5sWN6dP17Ozh5mi-VitZw_387Sc8W8h0eDR8pKBZPQqKzibRdgOlBHhXXnrEcnFQBucvjJYdwEmOvz8_WfDK53-jZDoyytDQr2qr-O_g5GCKd3S-UQe-TJJHPtGdVMGmBOK5ANQq0MZI9WGnTO1Mx-42jQvFvrm8fXcNIxR8TQ_rEMpzT0-HXYaqf-e5jtrJeibKGFoGqpSDXg2dVGqSbsJoZwvhNiobQXcvLWgTQyQQsflJYicb6DDiZiDC1v-xKxxqRVYbcJ1S8x1rA4?type=png)
+```mermaid
+graph TD
+    A[ユーザークエリ] --> B[Query Processor]
+    B --> C[ベクトル検索 - Qdrant]
+    B --> D[グラフ検索 - Neo4j]
+    C --> E[関連コンテキスト取得]
+    D --> E
+    E --> F[LLM処理]
+    F --> G[回答生成]
+
+    subgraph データストア
+    H[ドキュメント] --> I[テキスト分割]
+    I --> J[エンベディング生成]
+    J --> C
+    I --> K[エンティティ抽出]
+    K --> D
+    end
+```
+
+## シーケンス図
+
+```mermaid
+sequenceDiagram
+    actor User as ユーザー
+    participant QP as Query Processor
+    participant VS as ベクトル検索(Qdrant)
+    participant GS as グラフ検索(Neo4j)
+    participant LLM as 大規模言語モデル
+    
+    User->>QP: 質問を入力
+    QP->>VS: セマンティック検索を実行
+    QP->>GS: エンティティと関係に基づく検索を実行
+    VS-->>QP: 関連テキストチャンクを返却
+    GS-->>QP: 関連エンティティと関係を返却
+    QP->>QP: 検索結果をマージして文脈を強化
+    QP->>LLM: 質問と拡張コンテキストを送信
+    LLM-->>QP: 生成された回答
+    QP-->>User: 回答を表示
+```
 
 ## インストール
 
