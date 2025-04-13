@@ -1,8 +1,10 @@
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from langchain_community.tools import DuckDuckGoSearchRun
-from langchain_core.tools import BaseTool, tool
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
 
 from ai_agent.multi_llm_agent.claude_agent import ClaudeAgent
 from ai_agent.multi_llm_agent.gemini_agent import GeminiAgent
@@ -37,6 +39,9 @@ class MultiLLMAgentManager:
         self.openai_agent = OpenAIAgent(model_name="gpt-4o-mini")
         self.claude_agent = ClaudeAgent()
         self.gemini_agent = GeminiAgent()
+
+        # メタエージェントの初期化 (GPT-4を使用)
+        self.meta_agent = ChatOpenAI(model="gpt-4o", temperature=0.7)
 
         # 役割に応じたエージェントのセットアップ
         self._setup_agents()
@@ -97,6 +102,7 @@ class MultiLLMAgentManager:
         """
         # 実装はシングルエージェントからの移植
         import os
+
         import requests
 
         # 環境変数からAPIキーを取得
@@ -131,9 +137,7 @@ class MultiLLMAgentManager:
             return f"YouTube検索中にエラーが発生しました: {str(e)}"
 
     def run(
-        self, 
-        query: str,
-        agents_to_use: Optional[List[AgentRole]] = None
+        self, query: str, agents_to_use: Optional[List[AgentRole]] = None
     ) -> Dict[str, Any]:
         """
         指定されたクエリに対して複数のエージェントを実行し、結果を集約します。
@@ -146,30 +150,31 @@ class MultiLLMAgentManager:
             各エージェントの結果と集約結果を含む辞書。
         """
         results = {}
-        
+
         # デフォルトではすべてのエージェントを使用
         if agents_to_use is None:
             agents_to_use = list(AgentRole)
-            
+
         # 各エージェントを実行
         if AgentRole.RESEARCHER in agents_to_use:
             results["researcher"] = self.openai_agent.run(query)
-            
+
         if AgentRole.ANALYZER in agents_to_use:
             results["analyzer"] = self.claude_agent.run(query)
-            
+
         if AgentRole.CREATOR in agents_to_use:
             results["creator"] = self.gemini_agent.run(query)
-            
+
         # 結果の集約
         aggregated_output = self._aggregate_results(results)
         results["aggregated"] = aggregated_output
-        
+
         return results
-    
+
     def _aggregate_results(self, results: Dict[str, Dict[str, Any]]) -> str:
         """
         各エージェントの結果を集約して統合された回答を生成します。
+        メタエージェントを使用して結果を分析し、高度な集約を行います。
 
         Args:
             results: 各エージェントからの結果を含む辞書。
@@ -177,23 +182,118 @@ class MultiLLMAgentManager:
         Returns:
             集約された回答の文字列。
         """
-        # 簡略化のため、各エージェントの出力を結合
+        # 各エージェントの結果を整理
+        raw_results = {}
+
+        if "researcher" in results and "output" in results["researcher"]:
+            raw_results["researcher"] = results["researcher"]["output"]
+        else:
+            # 部分的な結果や中間出力の処理
+            intermediate_results = ""
+            if (
+                "researcher" in results
+                and "intermediate_steps" in results["researcher"]
+            ):
+                for step in results["researcher"]["intermediate_steps"]:
+                    # ツール名と入力を取得
+                    tool = step[0]
+                    if hasattr(tool, "name"):
+                        tool_name = tool.name
+                    else:
+                        tool_name = "unknown_tool"
+
+                    tool_input = step[1]
+                    tool_output = step[2]
+
+                    # 中間ステップの情報を追加
+                    intermediate_results += f"- {tool_name}：{tool_input}\n"
+                    # 検索結果は長いため、一部のみ表示
+                    if len(str(tool_output)) > 300:
+                        tool_output = str(tool_output)[:300] + "...(省略)"
+                    intermediate_results += f"  結果：{tool_output}\n\n"
+
+            if intermediate_results:
+                raw_results["researcher"] = (
+                    f"収集された部分的な情報：\n{intermediate_results}"
+                )
+            else:
+                raw_results["researcher"] = (
+                    "反復制限または時間制限により処理が完了せず、十分な情報を収集できませんでした。"
+                )
+
+        if "analyzer" in results and "output" in results["analyzer"]:
+            raw_results["analyzer"] = results["analyzer"]["output"]
+        else:
+            raw_results["analyzer"] = "分析結果が生成されませんでした。"
+
+        if "creator" in results and "output" in results["creator"]:
+            raw_results["creator"] = results["creator"]["output"]
+        else:
+            raw_results["creator"] = "創造的提案が生成されませんでした。"
+
+        # メタエージェントによる高度な集約
+        meta_prompt = f"""
+        あなたはマルチLLMエージェントシステムにおけるメタエージェントです。
+        3つの異なるLLM（OpenAI、Claude、Gemini）が異なる役割で同じクエリを処理した結果を受け取りました。
+        これらの結果を分析し、整合性のある総合的な回答を生成してください。
+
+        各エージェントの役割と結果は以下の通りです：
+
+        1. リサーチャー（OpenAI GPT-4o-mini）:
+        情報収集の専門家として、事実に基づく最新情報を提供しています。
+
+        {raw_results["researcher"]}
+
+        2. アナライザー（Claude）:
+        情報分析の専門家として、収集された情報を批判的に分析し評価しています。
+
+        {raw_results["analyzer"]}
+
+        3. クリエイター（Gemini）:
+        創造的提案の専門家として、独創的な視点やコンテンツを提供しています。
+
+        {raw_results["creator"]}
+
+        これらの情報を統合し、以下の点を考慮して総合的な回答を生成してください：
+        
+        1. 各エージェントの強みを活かした統合
+        2. 情報の整合性チェックと矛盾の解消
+        3. 重要な洞察や発見の強調
+        4. 論理的で一貫性のある構成
+        5. ユーザーにとって実用的な情報の優先
+        
+        回答はマークダウン形式で、適切な見出しと構造を持つように整形してください。
+        また、反復は避け、簡潔かつ包括的な内容を心がけてください。
+        """
+
+        # メタエージェントによる集約の実行
+        meta_response = self.meta_agent.invoke(
+            [
+                SystemMessage(
+                    content="あなたはマルチエージェントシステムのメタエージェントです。複数のLLMからの出力を分析・集約し、高品質な統合回答を生成します。"
+                ),
+                HumanMessage(content=meta_prompt),
+            ]
+        )
+
+        meta_analysis = meta_response.content
+
+        # 生のエージェント結果とメタエージェントの分析を組み合わせた最終出力
         aggregated = "# マルチLLMエージェントからの集約結果\n\n"
-        
-        if "researcher" in results:
-            aggregated += "## リサーチ結果（OpenAI）\n"
-            aggregated += f"{results['researcher']['output']}\n\n"
-            
-        if "analyzer" in results:
-            aggregated += "## 分析結果（Claude）\n"
-            aggregated += f"{results['analyzer']['output']}\n\n"
-            
-        if "creator" in results:
-            aggregated += "## 創造的提案（Gemini）\n"
-            aggregated += f"{results['creator']['output']}\n\n"
-            
-        # 本来はここでメタエージェントが結果を分析し、より高度な集約を行うべき
-        
+        aggregated += meta_analysis
+
+        # 元のエージェント出力をセクションとして追加（任意）
+        aggregated += "\n\n## 各エージェントの詳細結果\n\n"
+
+        aggregated += "### リサーチ結果（OpenAI）\n"
+        aggregated += f"{raw_results['researcher']}\n\n"
+
+        aggregated += "### 分析結果（Claude）\n"
+        aggregated += f"{raw_results['analyzer']}\n\n"
+
+        aggregated += "### 創造的提案（Gemini）\n"
+        aggregated += f"{raw_results['creator']}\n\n"
+
         return aggregated
 
 
